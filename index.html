@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analiza Szkody Rzepak</title>
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+
+<header>
+  <div class="logo">🌾</div>
+  <div>
+    <h1>Analiza Szkody Rzepak</h1>
+    <p>Kalkulator procentu szkody — sekcje 8.3, 9 i korekta BBCH</p>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- BBCH -->
+  <div class="card">
+    <div class="card-title"><span class="badge">BBCH</span> Faza rozwoju podczas szkody</div>
+    <label class="field-label">Wybierz fazę BBCH (automatycznie ustawi współczynniki korekcyjne):</label>
+    <select class="bbch-select" id="bbchSelect">
+      <option value="">— wybierz fazę —</option>
+      <option value="00-29">BBCH 00–29: od wysiewu do tworzenia pędów bocznych</option>
+      <option value="30-39">BBCH 30–39: formowanie łodygi</option>
+      <option value="51-59">BBCH 51–59: formowanie pąków / pierwsze płatki</option>
+      <option value="60-65">BBCH 60–65: kwitnienie (10–50%)</option>
+      <option value="65-67">BBCH 65–67: pełnia i koniec kwitnienia</option>
+      <option value="71-79">BBCH 71–79: tworzenie łuszczyn</option>
+      <option value="81-85">BBCH 81–85: dojrzewanie</option>
+    </select>
+    <div class="bbch-info" id="bbchInfo" style="display:none"></div>
+  </div>
+
+  <!-- Tryb szybki -->
+  <div class="card quick-card">
+    <div class="card-title"><span class="badge" style="background:#e67e22">⚡</span> Tryb szybki — automatyczne wypełnienie 8.3</div>
+    <div class="quick-grid">
+      <div class="param-group">
+        <label>Liczba rzędów ścięć (B)</label>
+        <input type="number" id="qRowsB" min="1" max="6" step="1" value="4">
+      </div>
+      <div class="param-group">
+        <label>Docelowa średnia Ø B (%)</label>
+        <input type="number" id="qAvgB" min="0" max="100" step="0.5" placeholder="np. 13">
+      </div>
+      <div class="param-group">
+        <label>Liczba rzędów zgięć (C)</label>
+        <input type="number" id="qRowsC" min="0" max="6" step="1" value="0">
+        <div class="param-hint">0 = brak zgięć</div>
+      </div>
+      <div class="param-group">
+        <label>Docelowa średnia Ø C (%)</label>
+        <input type="number" id="qAvgC" min="0" max="100" step="0.5" placeholder="np. 5">
+        <div class="param-hint">Zostaw puste jeśli brak zgięć</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:14px;align-items:center;">
+      <button class="quick-btn" id="quickFillBtn">⚡ Generuj wartości</button>
+      <button class="quick-clear-btn" id="quickClearBtn">✕ Wyczyść</button>
+      <span id="quickInfo" style="font-size:0.8rem;color:#666"></span>
+    </div>
+  </div>
+
+  <!-- 8.2 -->
+  <div class="card">
+    <div class="card-title"><span class="badge">8.2</span> Ścięcia/Złamania i zgięcia na pojedyńczych roślinach</div>
+    <div id="section82Container"></div>
+  </div>
+
+  <!-- 8.3 Ścięcia -->
+  <div class="card">
+    <div class="card-title"><span class="badge">8.3</span> Ścięcia / Złamania — 10 roślin w rzędzie</div>
+    <div class="col-headers">
+      <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+      <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+      <span>Śr. %</span>
+    </div>
+    <div id="scieciaRows"></div>
+    <button class="add-row-btn" id="addScieciaBtn">+ Dodaj rząd</button>
+    <div class="srednia-row">
+      <span>Ø B — Średnia ścięć (ogólna ocena roślin)</span>
+      <span class="srednia-val"><span id="sredniaSciecia">—</span> %</span>
+    </div>
+  </div>
+
+  <!-- 8.3 Zgięcia -->
+  <div class="card">
+    <div class="card-title"><span class="badge">8.3</span> Zgięcia / Tworzenie się fajki — 10 roślin w rzędzie</div>
+    <div class="col-headers">
+      <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+      <span>6</span><span>7</span><span>8</span><span>9</span><span>10</span>
+      <span>Śr. %</span>
+    </div>
+    <div id="zgieciaRows"></div>
+    <button class="add-row-btn" id="addZgieciaBtn">+ Dodaj rząd</button>
+    <div class="srednia-row">
+      <span>Ø C — Średnia zgięć (ogólna ocena roślin)</span>
+      <span class="srednia-val"><span id="sredniaZgiecia">—</span> %</span>
+    </div>
+  </div>
+
+  <!-- Params -->
+  <div class="card">
+    <div class="card-title"><span class="badge">6 + 7</span> Współczynniki korekcyjne i ubytki</div>
+    <div class="params-grid">
+      <div class="param-group">
+        <label>Współczynnik korekcyjny dla Ścięć (pkt 6.1)</label>
+        <input type="number" id="wsp61" step="0.01" min="0" max="1" placeholder="np. 0.35">
+        <div class="param-hint">Wartość dziesiętna, np. 0.35 = 35%</div>
+      </div>
+      <div class="param-group">
+        <label>Współczynnik korekcyjny dla Zgięć (pkt 6.2)</label>
+        <input type="number" id="wsp62" step="0.01" min="0" max="1" placeholder="np. 0.15">
+        <div class="param-hint">Wartość dziesiętna, np. 0.15 = 15%</div>
+      </div>
+      <div class="param-group">
+        <label>Wartość pkt 7 — ubytek z uszkodzeń łuszczyn (%)</label>
+        <input type="number" id="pkt7" step="0.01" min="0" max="100" placeholder="np. 1">
+        <div class="param-hint">Niski: 0–2%, Średni: 2–4%, Silny: 4–6%</div>
+      </div>
+      <div class="param-group">
+        <label>Ubytek plonu z innych przyczyn (pkt 3 + 4) (%)</label>
+        <input type="number" id="pkt34" step="0.1" min="0" max="100" placeholder="np. 5">
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results-card">
+    <div class="results-title">9. Obliczenie procentu szkody</div>
+    <div class="calc-steps">
+      <div class="calc-row"><span>Wartość pkt 6.1 (Ø B × wsp. korekcyjny ścięć)</span><span class="calc-val" id="r_pkt61">—</span></div>
+      <div class="calc-row"><span>Wartość pkt 6.2 (Ø C × wsp. korekcyjny zgięć)</span><span class="calc-val" id="r_pkt62">—</span></div>
+      <div class="calc-row highlight"><span>Reszta 1 = 100% − ubytek pkt 3+4</span><span class="calc-val" id="r_reszta1">—</span></div>
+      <div class="calc-row"><span>Kwota 1 = Reszta 1 × pkt 6.1</span><span class="calc-val" id="r_kwota1">—</span></div>
+      <div class="calc-row"><span>Kwota 2 = Reszta 1 × pkt 6.2</span><span class="calc-val" id="r_kwota2">—</span></div>
+      <div class="calc-row highlight"><span>Reszta 2 = Reszta 1 − (Kwota 1 + Kwota 2)</span><span class="calc-val" id="r_reszta2">—</span></div>
+      <div class="calc-row"><span>Kwota 3 = Reszta 2 × pkt 7</span><span class="calc-val" id="r_kwota3">—</span></div>
+    </div>
+    <div class="final-result">
+      <div class="label">OGÓLNY PROCENT SZKODY</div>
+      <div class="value" id="r_total">—<sup>%</sup></div>
+      <div class="damage-bar"><div class="damage-bar-fill" id="damageBar" style="width:0%"></div></div>
+    </div>
+    <button class="pdf-btn" id="pdfBtn">📄 Generuj i pobierz wypełniony formularz PDF</button>
+    <div id="pdfStatus"></div>
+  </div>
+
+</div>
+
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

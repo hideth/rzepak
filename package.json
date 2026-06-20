@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "pdf-lib": "^1.17.1"
+  },
+  "name": "rzepak",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}
