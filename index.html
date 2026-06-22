@@ -2,7 +2,10 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#1a1a2e">
 <title>Analiza Szkody Rzepak</title>
 <link rel="stylesheet" href="/src/style.css">
 </head>
@@ -14,12 +17,13 @@
     <h1>Analiza Szkody Rzepak</h1>
     <p>Kalkulator procentu szkody — sekcje 8.3, 9 i korekta BBCH</p>
   </div>
+  <button class="header-clear-btn" id="quickClearBtn">✕ Wyczyść</button>
 </header>
 
 <div class="container">
 
-  <!-- BBCH -->
-  <div class="card">
+  <!-- BBCH (tymczasowo ukryte) -->
+  <div class="card" style="display:none">
     <div class="card-title"><span class="badge">BBCH</span> Faza rozwoju podczas szkody</div>
     <label class="field-label">Wybierz fazę BBCH (automatycznie ustawi współczynniki korekcyjne):</label>
     <select class="bbch-select" id="bbchSelect">
@@ -60,7 +64,6 @@
     </div>
     <div style="display:flex;gap:10px;margin-top:14px;align-items:center;">
       <button class="quick-btn" id="quickFillBtn">⚡ Generuj wartości</button>
-      <button class="quick-clear-btn" id="quickClearBtn">✕ Wyczyść</button>
       <span id="quickInfo" style="font-size:0.8rem;color:#666"></span>
     </div>
   </div>

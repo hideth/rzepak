@@ -38,27 +38,19 @@ export interface CalcResult {
 export interface Plant82 {
   sg: (number | null)[];
   sa: (number | null)[];
-  sk: (number | null)[];
 }
 
 export interface Plant82Result {
   sgTotal: number;
   saTotal: number;
-  skTotal: number;
   sciecia: number; // SA/SG × 100
-  zgiecia: number; // SK/SG × 100
 }
 
 export function calcPlant82(p: Plant82): Plant82Result | null {
   const sgTotal = p.sg.reduce<number>((s, v) => s + (v ?? 0), 0);
   if (sgTotal === 0) return null;
   const saTotal = p.sa.reduce<number>((s, v) => s + (v ?? 0), 0);
-  const skTotal = p.sk.reduce<number>((s, v) => s + (v ?? 0), 0);
-  return {
-    sgTotal, saTotal, skTotal,
-    sciecia: saTotal / sgTotal * 100,
-    zgiecia: skTotal / sgTotal * 100,
-  };
+  return { sgTotal, saTotal, sciecia: saTotal / sgTotal * 100 };
 }
 
 export interface BbchEntry {

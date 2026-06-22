@@ -1,8 +1,10 @@
 import { BBCH_TABLE, calculate } from './calculate';
 import { RowGroup } from './ui';
 import { Section82 } from './section82';
+import { RowInputModal, PlantPairModal } from './modal';
 import { fillPdf } from './pdf';
 import { generateRows } from './quickMode';
+import { saveState, loadState, clearState } from './storage';
 import { calcPlant82 } from './types';
 import type { CalcResult, Plant82 } from './types';
 import templateB64 from './template.b64?raw';
@@ -32,16 +34,39 @@ const els = {
 
 let lastCalc: CalcResult | null = null;
 
-// ── Section 8.2 — created first (constructor only stores callback, never calls it)
-const section82 = new Section82(recalc);
+// ── Modals (singletons) ───────────────────────────────────────────────────────
+const modal = new RowInputModal();
+const plantModal = new PlantPairModal();
+
+// ── Section 8.2 ──────────────────────────────────────────────────────────────
+const section82 = new Section82(recalc, plantModal);
 document.getElementById('section82Container')!.appendChild(section82.el);
 
-// ── Row groups — created after section82 so recalc can safely access section82 ─
-const scieciaGroup = new RowGroup('sciecia', 'scieciaRows', 'addScieciaBtn', recalc);
-const zgieciaGroup = new RowGroup('zgiecia', 'zgieciaRows', 'addZgieciaBtn', recalc);
-scieciaGroup.addRow();
-scieciaGroup.addRow();
-zgieciaGroup.addRow();
+// ── Row groups ────────────────────────────────────────────────────────────────
+const scieciaGroup = new RowGroup('sciecia', 'scieciaRows', 'addScieciaBtn', recalc, modal);
+const zgieciaGroup = new RowGroup('zgiecia', 'zgieciaRows', 'addZgieciaBtn', recalc, modal);
+
+// ── Restore from localStorage ─────────────────────────────────────────────────
+// IMPORTANT: loadState() must be called BEFORE addRow(), because addRow() triggers
+// recalc() → saveState(), which would overwrite localStorage with empty data.
+const saved = loadState();
+if (saved) {
+  if (saved.bbch)  { bbchSelect.value = saved.bbch; bbchSelect.dispatchEvent(new Event('change')); }
+  if (saved.wsp61) wsp61Input.value = saved.wsp61;
+  if (saved.wsp62) wsp62Input.value = saved.wsp62;
+  if (saved.pkt7)  pkt7Input.value  = saved.pkt7;
+  if (saved.pkt34) pkt34Input.value = saved.pkt34;
+  if (saved.scieciaRows?.length) scieciaGroup.restore(saved.scieciaRows);
+  else { scieciaGroup.addRow(); scieciaGroup.addRow(); }
+  if (saved.zgieciaRows?.length) zgieciaGroup.restore(saved.zgieciaRows);
+  else { zgieciaGroup.addRow(); }
+  section82.restore(saved);
+  recalc();
+} else {
+  scieciaGroup.addRow();
+  scieciaGroup.addRow();
+  zgieciaGroup.addRow();
+}
 
 // ── BBCH selector ─────────────────────────────────────────────────────────────
 bbchSelect.addEventListener('change', () => {
@@ -58,14 +83,14 @@ bbchSelect.addEventListener('change', () => {
 [wsp61Input, wsp62Input, pkt7Input, pkt34Input].forEach(el =>
   el.addEventListener('input', recalc));
 
-// ── Recalculate ───────────────────────────────────────────────────────────────
+// ── Recalculate + auto-save ───────────────────────────────────────────────────
 function recalc() {
   const wsp61 = parseFloat(wsp61Input.value);
   const wsp62 = parseFloat(wsp62Input.value);
   const pkt7  = parseFloat(pkt7Input.value);
   const pkt34 = parseFloat(pkt34Input.value);
 
-  // ── 8.2 results (may override 8.3 when 8.3 is empty) ──
+  // 8.2 results
   const plants82Data = section82.plantsData;
   const valid82Results = plants82Data
     .filter((p): p is Plant82 => p !== null)
@@ -75,30 +100,19 @@ function recalc() {
   const sciecia82 = valid82Results.length > 0
     ? valid82Results.reduce((s, r) => s + r!.sciecia, 0) / valid82Results.length
     : undefined;
-  const zgiecia82 = valid82Results.length > 0
-    ? valid82Results.reduce((s, r) => s + r!.zgiecia, 0) / valid82Results.length
-    : undefined;
+  const zgiecia82 = undefined; // SK removed from 8.2
 
-  // ── 8.3 row averages display ──
-  const bAvgs = scieciaGroup.rowAvgs;
-  const cAvgs = zgieciaGroup.rowAvgs;
-  const bFilled = bAvgs.filter((v): v is number => v !== null);
-  const cFilled = cAvgs.filter((v): v is number => v !== null && v > 0);
-
-  // Effective sredniaSciecia: from 8.3 if available, else from 8.2
-  const sredniaSciecia83 = bFilled.length
-    ? bFilled.reduce((a, b) => a + b, 0) / bFilled.length
-    : null;
-
+  // 8.3 averages
+  const bFilled = scieciaGroup.rowAvgs.filter((v): v is number => v !== null);
+  const cFilled = zgieciaGroup.rowAvgs.filter((v): v is number => v !== null && v > 0);
+  const sredniaSciecia83 = bFilled.length ? bFilled.reduce((a,b) => a+b,0)/bFilled.length : null;
   const effectiveSciecia = sredniaSciecia83 ?? sciecia82 ?? null;
   const effectiveZgiecia = cFilled.length
-    ? cFilled.reduce((a, b) => a + b, 0) / cFilled.length
-    : (zgiecia82 ?? 0);
+    ? cFilled.reduce((a,b) => a+b,0)/cFilled.length : (zgiecia82 ?? 0);
 
-  // Display: show which source is active
   if (effectiveSciecia !== null) {
-    const source = sredniaSciecia83 !== null ? '' : ' (z 8.2)';
-    els.sredniaSciecia.textContent = effectiveSciecia.toFixed(4) + source;
+    const src = sredniaSciecia83 !== null ? '' : ' (z 8.2)';
+    els.sredniaSciecia.textContent = effectiveSciecia.toFixed(4) + src;
   } else {
     els.sredniaSciecia.textContent = '—';
   }
@@ -106,8 +120,7 @@ function recalc() {
 
   const result = calculate(
     scieciaGroup.rowValues, zgieciaGroup.rowValues,
-    wsp61, wsp62, pkt7, pkt34,
-    sciecia82, zgiecia82,
+    wsp61, wsp62, pkt7, pkt34, sciecia82, zgiecia82,
   );
   lastCalc = result;
 
@@ -116,21 +129,31 @@ function recalc() {
       .forEach(k => els[k].textContent = '—');
     els.total.innerHTML = '—<sup>%</sup>';
     els.bar.style.width = '0%';
-    // Hint
-    if (isNaN(wsp61)) els.pkt61.textContent = 'Wybierz BBCH →';
+    if (isNaN(wsp61))             els.pkt61.textContent = 'Wybierz BBCH →';
     else if (effectiveSciecia === null) els.pkt61.textContent = 'Uzupełnij 8.2 lub 8.3 →';
-    return;
+  } else {
+    els.pkt61.textContent   = result.pkt61.toFixed(4)   + ' %';
+    els.pkt62.textContent   = result.pkt62.toFixed(4)   + ' %';
+    els.reszta1.textContent = result.reszta1.toFixed(4) + ' %';
+    els.kwota1.textContent  = result.kwota1.toFixed(4)  + ' %';
+    els.kwota2.textContent  = result.kwota2.toFixed(4)  + ' %';
+    els.reszta2.textContent = result.reszta2.toFixed(4) + ' %';
+    els.kwota3.textContent  = result.kwota3.toFixed(4)  + ' %';
+    els.total.innerHTML     = result.total.toFixed(2)   + '<sup>%</sup>';
+    els.bar.style.width     = Math.min(result.total, 100) + '%';
   }
 
-  els.pkt61.textContent   = result.pkt61.toFixed(4)   + ' %';
-  els.pkt62.textContent   = result.pkt62.toFixed(4)   + ' %';
-  els.reszta1.textContent = result.reszta1.toFixed(4) + ' %';
-  els.kwota1.textContent  = result.kwota1.toFixed(4)  + ' %';
-  els.kwota2.textContent  = result.kwota2.toFixed(4)  + ' %';
-  els.reszta2.textContent = result.reszta2.toFixed(4) + ' %';
-  els.kwota3.textContent  = result.kwota3.toFixed(4)  + ' %';
-  els.total.innerHTML     = result.total.toFixed(2)   + '<sup>%</sup>';
-  els.bar.style.width     = Math.min(result.total, 100) + '%';
+  // Auto-save
+  saveState({
+    bbch:  bbchSelect.value,
+    wsp61: wsp61Input.value,
+    wsp62: wsp62Input.value,
+    pkt7:  pkt7Input.value,
+    pkt34: pkt34Input.value,
+    scieciaRows: scieciaGroup.rowValues,
+    zgieciaRows: zgieciaGroup.rowValues,
+    ...section82.getStorageData(),
+  });
 }
 
 // ── Tryb szybki ───────────────────────────────────────────────────────────────
@@ -147,10 +170,10 @@ quickFillBtn.addEventListener('click', () => {
   const avgB  = parseFloat(qAvgB.value);
   const rowsC = Math.min(6, Math.max(0, parseInt(qRowsC.value) || 0));
   const avgC  = parseFloat(qAvgC.value);
-
   if (isNaN(avgB)) { quickInfo.textContent = 'Wpisz docelową średnią Ø B.'; return; }
 
-  scieciaGroup.fillFromQuick(generateRows(rowsB, avgB));
+  const bArrays = generateRows(rowsB, avgB);
+  scieciaGroup.fillFromQuick(bArrays);
 
   if (rowsC > 0 && !isNaN(avgC)) {
     zgieciaGroup.fillFromQuick(generateRows(rowsC, avgC));
@@ -159,28 +182,38 @@ quickFillBtn.addEventListener('click', () => {
     zgieciaGroup.addRow();
   }
 
-  const bArrays = generateRows(rowsB, avgB);
-  const oBActual = bArrays.map(r => r.reduce((a, b) => a + b, 0) / 10)
-    .reduce((a, b) => a + b, 0) / rowsB;
-  quickInfo.textContent = `Wygenerowano. Ø B = ${oBActual.toFixed(2)}%`;
+  const oB = bArrays.map(r => r.reduce((a,b) => a+b,0)/10).reduce((a,b) => a+b,0)/rowsB;
+  quickInfo.textContent = `Wygenerowano. Ø B = ${oB.toFixed(2)}%`;
 });
 
 quickClearBtn.addEventListener('click', () => {
+  // 8.3
   scieciaGroup.clearAll();
   zgieciaGroup.clearAll();
-  quickInfo.textContent = 'Wyczyszczono.';
+  // 8.2
+  section82.clearAll();
+  // Koefficienty i parametry
+  bbchSelect.value = '';
+  bbchInfoBox.style.display = 'none';
+  wsp61Input.value = '';
+  wsp62Input.value = '';
+  pkt7Input.value  = '';
+  pkt34Input.value = '';
+  // LocalStorage
+  clearState();
+  recalc();
+  quickInfo.textContent = 'Wyczyszczono wszystko.';
 });
 
 // ── PDF button ────────────────────────────────────────────────────────────────
 pdfBtn.addEventListener('click', async () => {
-  if (!lastCalc) { pdfStatus.textContent = 'Najpierw uzupełnij sekcję 8.3 i wsp. korekcyjny.'; return; }
+  if (!lastCalc) { pdfStatus.textContent = 'Uzupełnij 8.2 lub 8.3 i wybierz BBCH.'; return; }
   pdfBtn.disabled = true;
   pdfStatus.textContent = 'Generowanie...';
   try {
     const binary = atob(templateB64);
     const bytes  = new Uint8Array(binary.length);
     for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-
     const out  = await fillPdf(bytes.buffer, lastCalc, section82.plantsData);
     const blob = new Blob([out as unknown as BlobPart], { type: 'application/pdf' });
     const url  = URL.createObjectURL(blob);

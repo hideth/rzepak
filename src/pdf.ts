@@ -18,8 +18,8 @@ const COL_X = [707.9, 736.4, 765.0, 793.5, 822.0, 850.6, 879.1, 907.6, 936.2, 96
 
 // Section 8.2 — y-centers per row, per plant (calibrated with ghostscript)
 const S82 = {
-  p1: { sg: 731, sa: 710, sk: 687 },
-  p2: { sg: 661, sa: 638, sk: 615 },
+  p1: { sg: 731, sa: 710 },
+  p2: { sg: 661, sa: 638 },
 } as const;
 
 // Section 9 field positions (x of "%" sign, value right-aligned before it)
@@ -80,16 +80,10 @@ export async function fillPdf(
 
     drawRow(plant.sg, coords.sg);
     drawRow(plant.sa, coords.sa);
-    drawRow(plant.sk, coords.sk);
 
-    // SG total — right-aligned before "=" at x=993
-    val(String(res.sgTotal), 993, coords.sg);
-    // SA total + SA%
+    val(String(res.sgTotal), 993,  coords.sg);
     val(String(res.saTotal), 993,  coords.sa);
     val(f(res.sciecia, 2),   1098, coords.sa);
-    // SK total + SK%
-    val(String(res.skTotal), 993,  coords.sk);
-    val(f(res.zgiecia, 2),   1098, coords.sk);
   });
 
   // ── Section 8.3 ──────────────────────────────────────────────────────────────
